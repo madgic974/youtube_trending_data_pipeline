@@ -5,11 +5,9 @@ USER root
 
 # Installer psycopg2 pour PostgreSQL
 RUN apt-get update && \
-    apt-get install -y python3-pip && \
-    pip3 install --no-cache-dir pyspark==3.5.1 psycopg2-binary
+    pip3 install --no-cache-dir psycopg2-binary
 
 WORKDIR /opt/spark/work-dir
 COPY spark_jobs/ ./spark_jobs/
 
-# Commande pour exécuter le script
-CMD ["spark-submit","--packages", "org.postgresql:postgresql:42.6.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1","/opt/spark/work-dir/spark_jobs/batch_transform.py"]
+CMD ["/opt/spark/bin/spark-submit","--packages", "org.postgresql:postgresql:42.6.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1","/opt/spark/work-dir/spark_jobs/batch_transform.py"]

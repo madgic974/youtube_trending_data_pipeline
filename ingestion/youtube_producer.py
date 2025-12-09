@@ -4,6 +4,9 @@ import time
 import requests
 from kafka import KafkaProducer, errors
 from dotenv import load_dotenv
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 load_dotenv()  # charge le fichier .env automatiquement
 
@@ -18,10 +21,10 @@ def create_producer(retries=5, delay=5):
                 bootstrap_servers=[KAFKA_BROKER],
                 value_serializer=lambda v: json.dumps(v).encode("utf-8"),
             )
-            print(f"[INFO] Connected to Kafka at {KAFKA_BROKER}")
+            logging.info(f"Connected to Kafka at {KAFKA_BROKER}")
             return producer
         except errors.NoBrokersAvailable:
-            print(f"[WARN] Kafka unavailable, retry {i+1}/{retries}")
+            logging.warning(f"Kafka unavailable, retry {i+1}/{retries}")
             time.sleep(delay)
     raise Exception("Kafka not available after retries")
 
@@ -38,15 +41,15 @@ def fetch_trending_videos(region="FR", max_results=10):
         res.raise_for_status()
         return res.json().get("items", [])
     except Exception as e:
-        print("[ERROR] YouTube API error:", e)
+        logging.error("YouTube API error: %s", e)
         return []
 
 if __name__ == "__main__":
-    print("[INFO] YouTube Producer started.")
+    logging.info("YouTube Producer started.")
     while True:
         videos = fetch_trending_videos()
         for video in videos:
             producer.send(TOPIC, video)
         producer.flush()
-        print(f"[INFO] Sent {len(videos)} videos to Kafka")
+        logging.info("Sent %d videos to Kafka", len(videos))
         time.sleep(300)  # every 5 min
