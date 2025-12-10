@@ -28,8 +28,6 @@ def create_producer(retries=5, delay=5):
             time.sleep(delay)
     raise Exception("Kafka not available after retries")
 
-producer = create_producer()
-
 def fetch_trending_videos(region="FR", max_results=10):
     url = (
         f"https://www.googleapis.com/youtube/v3/videos?"
@@ -44,12 +42,36 @@ def fetch_trending_videos(region="FR", max_results=10):
         logging.error("YouTube API error: %s", e)
         return []
 
-if __name__ == "__main__":
-    logging.info("YouTube Producer started.")
-    while True:
+def main():
+    """
+    Fonction principale pour récupérer les vidéos, les envoyer à Kafka, et se terminer.
+    """
+    logging.info("Starting YouTube data ingestion batch job.")
+    producer = None
+    try:
+        producer = create_producer()
         videos = fetch_trending_videos()
+
+        if not videos:
+            logging.info("No new videos found to send. Exiting.")
+            return
+
+        logging.info(f"Found {len(videos)} videos to send to Kafka topic '{TOPIC}'.")
         for video in videos:
             producer.send(TOPIC, video)
+
+        # Attendre que tous les messages soient envoyés avant de continuer
         producer.flush()
-        logging.info("Sent %d videos to Kafka", len(videos))
-        time.sleep(300)  # every 5 min
+        logging.info(f"Successfully sent {len(videos)} videos to Kafka.")
+
+    except Exception as e:
+        logging.error(f"An error occurred during the ingestion job: {e}")
+        raise  # Propage l'exception pour qu'Airflow marque la tâche comme échouée
+    finally:
+        if producer:
+            producer.close()
+            logging.info("Kafka producer closed.")
+        logging.info("YouTube data ingestion batch job finished.")
+
+if __name__ == "__main__":
+    main()

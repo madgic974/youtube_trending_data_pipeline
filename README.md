@@ -1,118 +1,158 @@
-# YouTube Trending Data Pipeline
+<!-- omit in toc -->
+<h1 align="center">End-to-End YouTube Trending Data Pipeline</h1>
 
-## 📝 Description
+This project is a personal initiative to design, build, and deploy a complete data engineering pipeline. It demonstrates key skills in data orchestration, distributed processing, and system architecture using modern data stack technologies. The goal is to process data from the YouTube API and make it available for analytics, showcasing a practical application of data engineering principles.
 
-Ce projet met en œuvre un pipeline de données pour récupérer les données des vidéos tendance de l'API YouTube, les traiter en temps quasi réel et les stocker pour une analyse ultérieure. L'ensemble de l'infrastructure est conteneurisé à l'aide de Docker et orchestré avec Docker Compose.
+As an aspiring Data Engineer, I undertook this project to bridge the gap between theory and practice. My primary objective is to expand my technical skillset by mastering industry-standard tools such as Kafka, Airflow, and Docker. This initiative reflects my dedication to continuous learning and my drive to solve complex data challenges using modern infrastructure.
 
-## 🏗️ Architecture
+**Core Competencies Demonstrated:**
+- **Data Orchestration:** Scheduling, executing, and monitoring complex data workflows with **Apache Airflow**.
+- **Distributed Data Processing:** Transforming and loading data in a scalable manner using **Apache Spark**.
+- **Data Ingestion & Messaging:** Building a resilient ingestion service and decoupling system components with **Python** and **Apache Kafka**.
+- **Containerization & IaC:** Defining and managing a multi-service application using **Docker** and **Docker Compose**, embodying Infrastructure as Code principles.
+- **System Architecture:** Designing an end-to-end batch processing pipeline, from API polling to database storage.
+- **Database Management:** Storing structured data in a relational database (**PostgreSQL**) and writing efficient `UPSERT` queries.
 
-Le flux de données passe par les composants suivants :
+---
 
-1.  **`youtube_producer` (Python)** : Un script Python qui récupère périodiquement les données des vidéos tendance depuis l'API YouTube v3.
-2.  **`kafka` (Confluent Platform)** : Le producteur envoie les données brutes à un topic Kafka nommé `youtube_trending`. Kafka sert de courtier de messages, découplant l'ingestion du traitement des données.
-3.  **`spark` (Apache Spark)** : Un job Spark consomme les données du topic Kafka. Il effectue des transformations, nettoie les données et les charge dans une base de données PostgreSQL.
-4.  **`postgres` (PostgreSQL)** : Une base de données relationnelle utilisée pour stocker les données vidéo traitées et structurées.
-5.  **`pgadmin` (pgAdmin 4)** : Une interface graphique web pour gérer et interroger les données stockées dans la base de données PostgreSQL.
-6.  **`zookeeper`** : Nécessaire pour la gestion du cluster Kafka.
+## 🏗️ Architecture & Data Flow
 
-## ✨ Fonctionnalités
+The entire pipeline is orchestrated by Apache Airflow. A DAG is scheduled to run every 30 minutes, executing the following sequence of tasks:
 
-*   Ingestion de données depuis l'API YouTube.
-*   Streaming de données résilient et évolutif avec Kafka.
-*   Traitement de données distribué avec Apache Spark.
-*   Stockage de données structurées dans une base de données PostgreSQL.
-*   Interface web simple pour la gestion de la base de données avec pgAdmin.
-*   Entièrement conteneurisé et orchestré avec Docker Compose pour une configuration facile.
+1.  **Orchestration (`Apache Airflow`)**:
+    - A DAG (`youtube_data_pipeline`) is scheduled to run every 30 minutes.
+    - Airflow manages task dependencies, retries, and logging.
 
-## 🛠️ Stack Technique
+2.  **Task 1: Data Ingestion (`Python` & `DockerOperator`)**:
+    - Airflow's `DockerOperator` launches a container from a dedicated Python image.
+    - This ephemeral container runs a Python script that fetches the most popular videos in France from the YouTube v3 API.
+    - The raw data (JSON) is then published to a Kafka topic named `youtube_trending`.
 
-*   **Orchestration** : Docker, Docker Compose
-*   **Langage de Programmation** : Python 3.11
-*   **Streaming de Données** : Apache Kafka
-*   **Traitement de Données** : Apache Spark 3.5
-*   **Base de Données** : PostgreSQL 15
-*   **API** : YouTube Data API v3
+3.  **Data Buffering (`Apache Kafka`)**:
+    - Kafka acts as a resilient message broker, decoupling the ingestion process from the transformation process. This allows services to operate independently.
 
-## 🚀 Démarrage
+4.  **Task 2: Data Transformation (`Spark` & `DockerOperator`)**:
+    - Upon successful completion of the ingestion task, Airflow triggers a second `DockerOperator`.
+    - This operator launches a container with Apache Spark.
+    - The Spark job reads all available data from the `youtube_trending` Kafka topic in a batch process (`read` from earliest to latest offsets).
+    - It performs transformations (schema enforcement, data type casting) and deduplication.
+
+5.  **Data Storage (`PostgreSQL`)**:
+    - The transformed data is loaded into a PostgreSQL database.
+    - An `INSERT ... ON CONFLICT DO UPDATE` (UPSERT) statement is used to efficiently insert new videos and update existing ones.
+
+
+## 🛠️ Tech Stack
+
+| Category          | Technology                                      |
+| ----------------- | ----------------------------------------------- |
+| **Orchestration** | Apache Airflow 2.9                              |
+| **Containerization**| Docker, Docker Compose                          |
+| **Data Processing** | Apache Spark 3.5                                |
+| **Messaging**     | Apache Kafka (Confluent Platform 7.5)           |
+| **Database**      | PostgreSQL 15                                   |
+| **Programming**   | Python 3.11                                     |
+| **API**           | YouTube Data API v3                             |
+| **DB Management** | pgAdmin 4                                       |
+
+## 🚀 Start
 
 ### Prérequis
 
 *   Docker
 *   Docker Compose
-*   Une clé d'API YouTube Data v3.
+*   A YouTube Data API v3 Key.
 
 ### Installation & Configuration
 
-1.  **Clonez le dépôt :**
+1.  **Clone the repository:**
     ```bash
-    git clone <votre-url-de-depot>
+    git clone <your-repo-url>
     cd youtube-trending-data-pipeline
     ```
 
-2.  **Créez le fichier d'environnement :**
-    Créez un fichier `.env` à la racine du projet en copiant le fichier d'exemple :
+2.  **Create the environment file:**
+    Create a `.env` file at the project root.
     ```bash
     cp .env.example .env
     ```
-    Ensuite, remplissez le fichier `.env` avec vos informations d'identification :
+    Then, fill the `.env` file with your credentials. It must include credentials for both the application's database and Airflow's metadata database.
     ```env
-    # Clé API YouTube
-    YOUTUBE_API_KEY=votre_cle_api_youtube
+    # YouTube API Key
+    YOUTUBE_API_KEY
 
-    # Identifiants Postgres
-    POSTGRES_USER=votre_utilisateur_postgres
-    POSTGRES_PASSWORD=votre_mot_de_passe_postgres
-    POSTGRES_DB=votre_nom_de_db
+    # Application Postgres Credentials
+    POSTGRES_USER
+    POSTGRES_PASSWORD
+    POSTGRES_DB
 
-    # Identifiants pgAdmin
-    PGADMIN_DEFAULT_EMAIL=votre_email@example.com
-    PGADMIN_DEFAULT_PASSWORD=votre_mot_de_passe_pgadmin
+    # pgAdmin Credentials
+    PGADMIN_DEFAULT_EMAIL
+    PGADMIN_DEFAULT_PASSWORD
+
+    # Airflow Postgres Credentials
+    AIRFLOW_POSTGRES_USER
+    AIRFLOW_POSTGRES_PASSWORD
+    AIRFLOW_POSTGRES_DB
+
+    # Airflow User ID (to avoid permission issues with Docker socket)
+    AIRFLOW_UID=50000
     ```
 
-3.  **Construisez et lancez les services :**
-    Utilisez Docker Compose pour construire les images et démarrer tous les conteneurs en mode détaché.
+3.  **Create Airflow directories:**
+    Airflow requires local directories for DAGs, logs, and plugins.
+    ```bash
+    mkdir -p dags logs plugins
+    ```
+
+4.  **Build and launch the services:**
+    Use Docker Compose to build all custom images and start the containers in detached mode.
     ```bash
     docker-compose up --build -d
     ```
 
 ### Utilisation
 
-*   **Pipeline de Données** : Le pipeline démarre automatiquement. Le service `youtube_producer` commencera à récupérer les données et à les envoyer à Kafka, et le service `spark` les traitera pour les stocker dans PostgreSQL.
-*   **Accéder à pgAdmin** :
-    *   Ouvrez votre navigateur web et allez sur `http://localhost:8080`.
-    *   Connectez-vous avec le `PGADMIN_DEFAULT_EMAIL` et le `PGADMIN_DEFAULT_PASSWORD` que vous avez définis dans le fichier `.env`.
-    *   Vous devrez ajouter une nouvelle connexion serveur pour accéder à la base de données PostgreSQL :
-        *   **Host name/address** : `postgres` (le nom du service dans `docker-compose.yml`)
-        *   **Port** : `5432`
-        *   **Maintenance database** : La valeur de `POSTGRES_DB`
-        *   **Username** : La valeur de `POSTGRES_USER`
-        *   **Password** : La valeur de `POSTGRES_PASSWORD`
-*   **Consulter les logs** : Pour voir les logs de tous les services, exécutez :
+1.  **Access the Airflow UI:**
+    - Open your browser and navigate to `http://localhost:8081`.
+    - Log in with the default credentials: `admin` / `admin`.
+
+2.  **Configure Airflow Variables:**
+    - The DAG requires API keys and credentials to be stored as Airflow Variables for security.
+    - In the Airflow UI, go to **Admin -> Variables**.
+    - Create the following variables:
+      - `YOUTUBE_API_KEY`: Your YouTube API key.
+      - `KAFKA_BROKER`: `kafka:9092`
+      - `POSTGRES_USER`: Your application's Postgres user.
+      - `POSTGRES_PASSWORD`: Your application's Postgres password.
+      - `POSTGRES_DB`: Your application's Postgres database name.
+
+3.  **Enable and Trigger the DAG:**
+    - On the main DAGs page, find `youtube_data_pipeline`.
+    - Unpause the DAG using the toggle on the left.
+    - The pipeline will now run automatically every 30 minutes. You can also trigger it manually by clicking the "Play" button on the right.
+
+4.  **Access pgAdmin:**
+    - Navigate to `http://localhost:8080`.
+    - Log in with the `PGADMIN_DEFAULT_EMAIL` and `PGADMIN_DEFAULT_PASSWORD` from your `.env` file.
+    - Add a new server connection to access the application database:
+        - **Host name/address**: `postgres` (the service name in `docker-compose.yml`)
+        - **Port**: `5432`
+        - **Maintenance database**: The value of `POSTGRES_DB`
+        - **Username**: The value of `POSTGRES_USER`
+        - **Password**: The value of `POSTGRES_PASSWORD`
+
+5.  **Monitor Logs:**
+    To view the logs for all running services:
     ```bash
     docker-compose logs -f
     ```
-    Pour suivre les logs d'un service spécifique (par exemple, `spark`) :
+    To follow the logs of a specific service (e.g., `airflow-scheduler`):
     ```bash
-    docker-compose logs -f spark
+    docker-compose logs -f airflow-scheduler
     ```
 
-## 📁 Structure du Projet
-
-```
-.
-├── Dockerfile.producer     # Dockerfile pour le producteur Python
-├── Dockerfile.spark        # Dockerfile pour le job Spark
-├── docker-compose.yml      # Fichier Docker Compose pour orchestrer tous les services
-├── ingestion/              # Contient le script du producteur Python
-├── requirements.txt        # Dépendances Python pour le producteur
-├── spark_jobs/             # Contient le script de traitement Spark
-├── sql/                    # Scripts SQL pour l'initialisation de la BDD
-└── README.md               # Ce fichier
-```
-
-## ⏹️ Arrêt
-
-Pour arrêter et supprimer tous les conteneurs, réseaux et volumes créés par Docker Compose, exécutez la commande suivante depuis la racine du projet :
+## ⏹️ Stop
 
 ```bash
 docker-compose down
