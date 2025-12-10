@@ -1,5 +1,5 @@
 <!-- omit in toc -->
-<h1 align="center">End-to-End YouTube Trending Data Pipeline</h1>
+<h1 align="center">Backend YouTube Trending Data Pipeline</h1>
 
 This project is a personal initiative to design, build, and deploy a complete data engineering pipeline. It demonstrates key skills in data orchestration, distributed processing, and system architecture using modern data stack technologies. The goal is to process data from the YouTube API and make it available for analytics, showcasing a practical application of data engineering principles.
 
